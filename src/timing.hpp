@@ -3,9 +3,16 @@
 #include <chrono>
 #include <fstream>
 #include <vector>
+#include <algorithm>
+#include <string>
+
+std::string replace_dots_with_commas(const std::string& input) {
+    std::string result = input;
+    std::replace(result.begin(), result.end(), '.', ',');
+    return result;
+}
 
 int write_time_to_csv(  
-        const std::string name,
         const std::string keyword,
         const double vol
     ){
@@ -27,7 +34,7 @@ int write_time_to_csv(
         csv_file << "Name" << sep << "Keyword" << sep << "Optimization" << sep << "Value\n";
     }
 
-    csv_file << name << sep << keyword << sep << sep << vol << "\n";
+    csv_file << replace_dots_with_commas(keyword) << sep << vol << "\n";
     csv_file.close();
 
     return 0;
