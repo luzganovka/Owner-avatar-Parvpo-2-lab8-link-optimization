@@ -1,4 +1,11 @@
+#include <iostream>
+#include <chrono>
+#include <complex>
 #include "timing.hpp"
+
+double discriminant (double a, double b, double c);
+double root2_compute (double a, double b, double c, double D);
+double root1_compute (double a, double b, double c, double D);
 
 void solveQuadratic(double a, double b, double c, double* res) {
     if (a == 0) {
@@ -19,25 +26,21 @@ void solveQuadratic(double a, double b, double c, double* res) {
         }
     }
 
-    double D = b * b - 4 * a * c;
+    double D = discriminant(a, b, c);
 
-    if (D < 0) {D = -D;}
-
-    if (D >= 0) {
-        double root1 = double(-b + sqrt(D)) / (2 * a);
-        double root2 = double(-b - sqrt(D)) / (2 * a);
-        *res += root1 + root2;
-        // std::cout << "Два корня: " << root1 << " и " << root2 << std::endl;
-    }
+    double root1 = root1_compute(a, b, c, D);
+    double root2 = root2_compute(a, b, c, D);
+    *res += root1 + root2;
+    // std::cout << "Два корня: " << root1 << " и " << root2 << std::endl;
     return;
 }
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
-        std::cerr << "Usage: " << argv[0] << " <iterations> <runs_num>\n";
+        std::cerr << "Usage: " << argv[0] << " <statistics_num> <runs_num>\n";
         return 1;
     }
-    int iterations = atoi(argv[1]);
+    int statistics_num = atoi(argv[1]);
     int runs_num = atoi(argv[2]);
     std::chrono::duration<double> duration;
     double avg = 0.0;
@@ -45,7 +48,7 @@ int main(int argc, char* argv[]) {
     double res = .0;
 
 
-    for (int i = 0; i < iterations; i++){
+    for (int i = 0; i < statistics_num; i++){
         auto start = std::chrono::high_resolution_clock::now();
 
         int _ = 0;
@@ -60,13 +63,13 @@ int main(int argc, char* argv[]) {
         auto end = std::chrono::high_resolution_clock::now();
         duration = end - start;
         avg = avg + duration.count();
-        if(i % ((int)(iterations/10)) == 0){std::cout << "iteration " << i << " | duration = " << duration.count() << "; summ = " << avg << std::endl;}
+        if(i % ((int)(statistics_num/10)) == 0){std::cout << "iteration " << i << " | duration = " << duration.count() << "; summ = " << avg << std::endl;}
     }
     std::cout << "result: " << res << std::endl; // только для того, чтобы компилятор не выкинул все вычисления
-    avg /= iterations;
+    avg /= statistics_num;
     std::cout << avg << " секунд" << std::endl;
 
-    write_time_to_csv("solver", "plain", avg);
+    write_time_to_csv(argv[0], avg);
 
     return 0;
 }
