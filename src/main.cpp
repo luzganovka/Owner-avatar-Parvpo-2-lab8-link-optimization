@@ -1,4 +1,11 @@
+#include <iostream>
+#include <chrono>
+#include <complex>
 #include "timing.hpp"
+
+double discriminant (double a, double b, double c);
+double root2_compute (double a, double b, double c, double D);
+double root1_compute (double a, double b, double c, double D);
 
 void solveQuadratic(double a, double b, double c, double* res) {
     if (a == 0) {
@@ -19,16 +26,12 @@ void solveQuadratic(double a, double b, double c, double* res) {
         }
     }
 
-    double D = b * b - 4 * a * c;
+    double D = discriminant(a, b, c);
 
-    if (D < 0) {D = -D;}
-
-    if (D >= 0) {
-        double root1 = double(-b + sqrt(D)) / (2 * a);
-        double root2 = double(-b - sqrt(D)) / (2 * a);
-        *res += root1 + root2;
-        // std::cout << "Два корня: " << root1 << " и " << root2 << std::endl;
-    }
+    double root1 = root1_compute(a, b, c, D);
+    double root2 = root2_compute(a, b, c, D);
+    *res += root1 + root2;
+    // std::cout << "Два корня: " << root1 << " и " << root2 << std::endl;
     return;
 }
 

@@ -4,11 +4,12 @@ CXX="clang++"
 CXXFLAGS="-Wall -Wextra -pedantic"
 SRC_DIR="src"
 BIN_DIR="bin"
-RESULTS_FILE="external_times.csv"
-ITERATIONS=10  # Количество запусков для усреднения
+RESULTS_FILE="compile_times.csv"
+ITERATIONS=10
+TARGET_NAME="program"  # Базовое имя исполняемого файла
 
 # Уровни оптимизации
-OPT_LEVELS=("O0" "O1" "O2" "O3" "Oz")
+OPT_LEVELS=("O0" "O1" "O2" "O3" "Os" "Oz")
 
 # Режимы LTO
 LTO_MODES=("no-lto" "thin-lto" "full-lto")
@@ -17,27 +18,25 @@ LTO_FLAGS=("" "-flto=thin" "-flto")
 mkdir -p "$BIN_DIR"
 
 # Заголовок CSV
-echo "Source File,Optimization Level,LTO Mode,Min Time (s),Avg Time (s),Max Time (s),Binary Size (Bytes)" > "$RESULTS_FILE"
+echo "Optimization Level,LTO Mode,Min Time (s),Avg Time (s),Max Time (s),Binary Size (bytes)" > "$RESULTS_FILE"
 
-# Функция для замера времени (использует time)
+# Функция для замера времени
 measure_compile() {
     local cmd="$1"
-    local total=0
-    local min_time=9999
-    local max_time=0
+    local total=0 min_time=9999 max_time=0
 
     for ((i=1; i<=ITERATIONS; i++)); do
-        # Чистим кеш компилятора (если поддерживается)
+        # Чистим кеш компилятора
         if command -v ccache &> /dev/null; then
             ccache -C >/dev/null
         fi
 
-        # Замеряем время через time
+        # Замер времени
         local time_output
         time_output=$( { time -p $cmd >/dev/null 2>&1; } 2>&1 )
         local real_time=$(echo "$time_output" | grep real | awk '{print $2}')
 
-        # Обновляем min/max/total
+        # Обновляем статистику
         total=$(echo "$total + $real_time" | bc)
         if (( $(echo "$real_time < $min_time" | bc -l) )); then
             min_time=$real_time
@@ -51,44 +50,51 @@ measure_compile() {
     echo "$min_time $avg_time $max_time"
 }
 
-measure_everything() {
-    local src_file="$1"
-    local opt="$2"
-    local lto="$3"
-    local lto_flag="$4"
-    local base_name=$(basename "$src_file" .cpp)
-    local output="$BIN_DIR/$base_name.$opt.$lto"
+# Компиляция всех файлов вместе
+compile_all() {
+    local opt="$1"
+    local lto="$2"
+    local lto_flag="$3"
+    local output="$BIN_DIR/$TARGET_NAME.$opt.$lto"
 
-    echo -n "Building $base_name with -$opt $lto (${ITERATIONS}x)..."
+    echo -n "Building with -$opt $lto (${ITERATIONS}x)..."
 
-    # Удаляем старый бинарник (если есть)
+    # Удаляем старый бинарник
     rm -f "$output"
 
     # Замер времени
-    local cmd="$CXX $CXXFLAGS -$opt $lto_flag $src_file -o $output"
+    local cmd="$CXX $CXXFLAGS -$opt $lto_flag ${CPP_FILES[@]} -o $output"
     read min_time avg_time max_time <<< $(measure_compile "$cmd")
 
-    # Замер размера бинарника
+    # Замер размера
     local binary_size=0
     if [ -f "$output" ]; then
         binary_size=$(du -b "$output" | cut -f1)
     fi
 
     # Запись в CSV
-    echo "$base_name,$opt,$lto,$min_time,$avg_time,$max_time,$binary_size" >> "$RESULTS_FILE"
-    echo " done (avg: ${avg_time}s, size: ${binary_size}Bytes)"
+    echo "$opt,$lto,$min_time,$avg_time,$max_time,$binary_size" >> "$RESULTS_FILE"
+    echo " done (avg: ${avg_time} s, size: ${binary_size} bytes)"
 }
 
-# Основной цикл
-src_file = "src/main.cpp src/funcs.cpp"
-for src_file in "$SRC_DIR"/*.cpp; do
-    if [ -f "$src_file" ]; then
-        for opt in "${OPT_LEVELS[@]}"; do
-            for i in "${!LTO_MODES[@]}"; do
-                measure_everything "$src_file" "$opt" "${LTO_MODES[$i]}" "${LTO_FLAGS[$i]}"
-            done
-        done
+main() {
+    # Находим все исходники
+    CPP_FILES=($(find "$SRC_DIR" -name "*.cpp" | sort))
+    if [ ${#CPP_FILES[@]} -eq 0 ]; then
+        echo "Ошибка: не найдено .cpp файлов в $SRC_DIR!"
+        exit 1
     fi
-done
 
-echo "Results saved to $RESULTS_FILE"
+    echo "Найдены исходники: ${CPP_FILES[@]}"
+
+    # Основной цикл
+    for opt in "${OPT_LEVELS[@]}"; do
+        for i in "${!LTO_MODES[@]}"; do
+            compile_all "$opt" "${LTO_MODES[$i]}" "${LTO_FLAGS[$i]}"
+        done
+    done
+
+    echo "Результаты сохранены в $RESULTS_FILE"
+}
+
+main
